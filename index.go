@@ -17,7 +17,7 @@ var (
 
 type CacheInterface interface {
 	Put(username, module, key string, right bool)
-	Get(username, module, key string, right bool) (bool, error)
+	Get(username, module, key string) (bool, error)
 	Invalidate(username string)
 }
 
@@ -36,13 +36,20 @@ func NewCache() CacheInterface {
 }
 func (c *Cache) Put(username, module, key string, right bool) {
 	c.locker.Lock()
-	rights := map[string]bool{key: right}
-	modulesname := map[string]map[string]bool{module: rights}
-	c.Store[username] = modulesname
-	c.locker.Unlock()
+	defer c.locker.Unlock()
+
+	if _, exists := c.Store[username]; !exists {
+		c.Store[username] = make(map[string]map[string]bool)
+	}
+	if _, exists := c.Store[username][module]; !exists {
+		c.Store[username][module] = make(map[string]bool)
+	}
+	c.Store[username][module][key] = right
 }
-func (c *Cache) Get(username, module, key string, right bool) (bool, error) {
+func (c *Cache) Get(username, module, key string) (bool, error) {
 	c.locker.Lock()
+	defer c.locker.Unlock()
+
 	users, ok := c.Store[username]
 	if !ok {
 		return false, fmt.Errorf("no such user")
@@ -53,9 +60,8 @@ func (c *Cache) Get(username, module, key string, right bool) (bool, error) {
 	}
 	keys, ok := modulesname[key]
 	if !ok {
-		return false, fmt.Errorf("no such key avaliable include %s and %s", READ, WRITE)
+		return false, fmt.Errorf("no such key available include %s and %s", READ, WRITE)
 	}
-	c.locker.Unlock()
 	return keys, nil
 }
 func (c *Cache) Invalidate(username string) {

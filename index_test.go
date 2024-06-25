@@ -6,19 +6,51 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCacheWorking(t *testing.T) {
-	cache := NewCache()
-	user := "myrachanto"
-	module := "users"
-	key := "READ"
-	right := true
-	cache.Put(user, module, key, right)
-	rightresult, err := cache.Get(user, module, key, right)
-	assert.EqualValues(t, right, rightresult)
-	assert.Nil(t, err)
-	cache.Invalidate(user)
-	ok, err := cache.Get(user, module, key, right)
-	assert.EqualValues(t, ok, false)
-	assert.NotNil(t, err)
+func TestCache(t *testing.T) {
+	tests := []struct {
+		name           string
+		actions        func(CacheInterface)
+		expectedResult bool
+		expectedError  bool
+	}{
+		{
+			name: "Put and Get cache entry",
+			actions: func(c CacheInterface) {
+				c.Put("myrachanto", "users", "READ", true)
+			},
+			expectedResult: true,
+			expectedError:  false,
+		},
+		{
+			name: "Invalidate cache entry and Get",
+			actions: func(c CacheInterface) {
+				c.Put("myrachanto", "users", "READ", true)
+				c.Invalidate("myrachanto")
+			},
+			expectedResult: false,
+			expectedError:  true,
+		},
+		{
+			name: "Get non-existing user",
+			actions: func(c CacheInterface) {
+			},
+			expectedResult: false,
+			expectedError:  true,
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewCache()
+			tt.actions(cache)
+			result, err := cache.Get("myrachanto", "users", "READ")
+
+			assert.Equal(t, tt.expectedResult, result)
+			if tt.expectedError {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+		})
+	}
 }
